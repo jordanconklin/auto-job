@@ -1,0 +1,38 @@
+{
+    "personal": {
+        "first_name": "Jordan",
+        "last_name": "Conklin",
+        "email": "jordinho@ucla.edu",
+        "phone": "408-444-1232",
+        "location": "Fremont, CA",
+        "linkedin": "https://linkedin.com/in/jordanconklin"
+    },
+    "experience": {
+        "years": 0,
+            "current_title": "Software Engineer",
+            "skills": [
+                "Python",
+                "JavaScript",
+                "React",
+                "Node.js",
+                "C++",
+                "TypeScript",
+                "PostgreSQL",
+                "MongoDB",
+                "Spring Boot",
+                "TensorFlow",
+                "NumPy",
+                "Scikit-Learn",
+                "CUDA",
+                "AWS",
+                "Kubernetes",
+                "REST APIs",
+                "Git"
+            ]
+    },
+    "education": {
+        "degree": "Bachelor's in Computer Science",
+        "school": "University Name",
+        "graduation_year": "2020"
+    }
+}
