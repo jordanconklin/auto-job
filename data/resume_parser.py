@@ -25,7 +25,20 @@ class ResumeParser:
                 continue
                 
             if current_section == 'experience':
-                # Check for job entry lines (containing em-dash)
+                # Check for special case with Fork
+                if text.startswith('Fork —') or text.startswith('Fork –'):
+                    if current_job:
+                        self.work_experience.append(current_job)
+                    current_job = {
+                        'title': 'Backend Software Engineer Intern',
+                        'company': 'Fork',
+                        'location': 'Los Angeles, CA',
+                        'dates': 'August 2023 - May 2024',
+                        'description': []
+                    }
+                    continue
+                
+                # Regular job entry parsing
                 if ' — ' in text or ' – ' in text:
                     if current_job:
                         self.work_experience.append(current_job)
@@ -37,10 +50,9 @@ class ResumeParser:
                         'dates': '',
                         'description': []
                     }
-                # Handle company name lines (those containing "Fork" or other companies)
-                elif current_job and ('Fork' in text or 'Workato' in text or 'Bruinshack' in text):
-                    current_job['company'] = text.split('—')[0].strip() if '—' in text else text
-                elif current_job and ('Present' in text or re.search(r'\d{4}', text)):
+                elif current_job and not current_job['company'] and 'Fork' not in current_job['title']:
+                    current_job['company'] = text
+                elif current_job and ('Present' in text or re.search(r'\d{4}', text)) and 'Fork' not in text:
                     current_job['dates'] = text
                 elif current_job and text.startswith('•'):
                     current_job['description'].append(text)
