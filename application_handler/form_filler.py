@@ -8,8 +8,8 @@ class FormFiller:
         
         # Fill personal information
         fields_to_fill = {
-            'name': self.profile.get_field('personal', 'first_name') + ' ' + 
-                    self.profile.get_field('personal', 'last_name'),
+            'first': self.profile.get_field('personal', 'first_name'),
+            'last': self.profile.get_field('personal', 'last_name'),
             'email': self.profile.get_field('personal', 'email'),
             'phone': self.profile.get_field('personal', 'phone')
         }
@@ -24,11 +24,7 @@ class FormFiller:
             else:
                 print(f"⚠️ Could not find or fill {field_name} field")
                 print("Attempted selectors:")
-                for selector in [
-                    f'input[name*="{field_name}" i]',
-                    f'input[id*="{field_name}" i]',
-                    f'input[placeholder*="{field_name}" i]'
-                ]:
+                for selector in self._get_selectors(field_name):
                     elements = page.query_selector_all(selector)
                     print(f"  - {selector}: found {len(elements)} elements")
 
@@ -80,3 +76,28 @@ class FormFiller:
                     print(f"Error getting attributes: {e}")
         
         return filled
+
+    def _get_selectors(self, field_name):
+        # Define field-specific selectors
+        if field_name == 'first':
+            return [
+                'input[name*="first" i]',
+                'input[id*="first" i]',
+                'input[placeholder*="first" i]',
+                'input[name*="firstname" i]',
+                'input[id*="firstname" i]'
+            ]
+        elif field_name == 'last':
+            return [
+                'input[name*="last" i]',
+                'input[id*="last" i]',
+                'input[placeholder*="last" i]',
+                'input[name*="lastname" i]',
+                'input[id*="lastname" i]'
+            ]
+        else:
+            return [
+                f'input[name*="{field_name}" i]',
+                f'input[id*="{field_name}" i]',
+                f'input[placeholder*="{field_name}" i]'
+            ]
