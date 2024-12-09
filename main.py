@@ -4,6 +4,22 @@ from data.user_profile import UserProfile
 from data.response_templates import ResponseTemplates
 from application_handler.form_filler import FormFiller
 from application_handler.application_tracker import ApplicationTracker
+from data.resume_parser import ResumeParser
+
+def handle_resume_upload(page):
+    print("\n📄 Looking for resume upload field...")
+    upload_button = page.query_selector('input[type="file"]')
+    if upload_button:
+        try:
+            upload_button.set_input_files('resume.docx')
+            print("✅ Resume uploaded successfully")
+            return True
+        except Exception as e:
+            print(f"⚠️ Failed to upload resume: {e}")
+            return False
+    else:
+        print("⚠️ Could not find resume upload field")
+        return False
 
 def main():
     # Initialize components
@@ -38,6 +54,15 @@ def main():
         form_filler.fill_common_fields(page)
         print("✅ Basic information filled")
 
+        # Add after filling common fields:
+        print("\n📄 Uploading and parsing resume...")
+        resume_path = 'resume.docx'
+        resume_parser = ResumeParser(resume_path)
+        
+        if handle_resume_upload(page):
+            print("\n📝 Filling work experience from resume...")
+            form_filler.fill_work_experience(page, resume_parser)
+        
         # Handle free response questions
         print("\n📋 Looking for free response questions...")
         free_responses = parser.detect_free_response_questions()

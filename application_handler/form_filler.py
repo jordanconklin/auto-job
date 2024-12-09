@@ -148,3 +148,97 @@ class FormFiller:
         except Exception as e:
             print(f"Error handling country dropdown: {e}")
             return False
+
+    def _handle_location_dropdowns(self, page, location):
+        # Parse location (assuming format like "Los Angeles, CA")
+        parts = location.split(',')
+        state = parts[1].strip() if len(parts) > 1 else ''
+        
+        # Try standard location dropdowns first
+        standard_selectors = [
+            'select[name*="location" i]',
+            'select[id*="location" i]',
+            'select[aria-label*="location" i]',
+            'select[name*="state" i]',
+            'select[id*="state" i]'
+        ]
+        
+        # Try template field selectors (matching the application's format)
+        template_selectors = [
+            'select.form-control.clonedInputElm',
+            'select[class*="form-control clonedInputElm"]',
+            'select[name*="templateField"]',
+            'select[id*="templateField"]'
+        ]
+        
+        # Try standard selectors first
+        for selector in standard_selectors:
+            dropdown = page.query_selector(selector)
+            if dropdown and self._try_select_location(dropdown, state):
+                return True
+            
+        # If standard selectors fail, try template selectors
+        for selector in template_selectors:
+            dropdown = page.query_selector(selector)
+            if dropdown and self._try_select_location(dropdown, state):
+                return True
+        
+        print("⚠️ Could not find or interact with location dropdown")
+        return False
+
+    def _try_select_location(self, dropdown, state):
+        try:
+            # Get available options
+            options = dropdown.evaluate("""(element) => {
+                return Array.from(element.options).map(opt => ({
+                    value: opt.value,
+                    text: opt.text
+                }));
+            }""")
+            
+            # Try to find best match for location
+            location_terms = [
+                state, "CA", "California",
+                "United States", "USA"
+            ]
+            
+            for term in location_terms:
+                for option in options:
+                    if term.lower() in option['text'].lower():
+                        dropdown.select_option(value=option['value'])
+                        print(f"✅ Selected location: {option['text']}")
+                        return True
+                    
+        except Exception as e:
+            print(f"Failed to select location: {e}")
+        
+        return False
+
+    def fill_work_experience(self, page, resume_parser):
+        print("\nAttempting to fill work experience...")
+        
+        job = resume_parser.get_most_recent_job()
+        if not job:
+            print("⚠️ No work experience found in resume")
+            return
+        
+        fields_to_fill = {
+            'company': job['company'],
+            'jobTitle': job['title'],
+            'employmentPeriod': job['dates'],
+            'jobDescription': '\n'.join(job['description'])
+        }
+        
+        # Fill regular fields
+        for field_name, value in fields_to_fill.items():
+            print(f"\nLooking for {field_name} field...")
+            success = self._fill_by_attribute(page, field_name, value)
+            if success:
+                print(f"✅ Filled {field_name} successfully")
+            else:
+                print(f"⚠️ Could not find or fill {field_name} field")
+        
+        # Handle location separately
+        if job['location']:
+            print("\nLooking for location dropdown...")
+            self._handle_location_dropdowns(page, job['location'])
