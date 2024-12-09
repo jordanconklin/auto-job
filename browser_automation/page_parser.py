@@ -7,7 +7,8 @@ class PageParser:
             'text_inputs': self.page.query_selector_all('input[type="text"]'),
             'email_inputs': self.page.query_selector_all('input[type="email"]'),
             'textareas': self.page.query_selector_all('textarea'),
-            'selects': self.page.query_selector_all('select')
+            'selects': self.page.query_selector_all('select'),
+            'dropdowns': self.page.query_selector_all('select, [role="combobox"]')
         }
         return fields
 

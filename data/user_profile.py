@@ -1,31 +1,35 @@
-
 import json
 from pathlib import Path
+import os
+from dotenv import load_dotenv
 
 class UserProfile:
-    def __init__(self, profile_path):
-        self.profile_path = Path(profile_path)
-        self.profile = self.load_profile()
+    def __init__(self):
+        load_dotenv()
+        self.profile = self.load_profile_from_env()
 
-    def load_profile(self):
-        try:
-            with open(self.profile_path, 'r') as f:
-                return json.load(f)
-        except Exception as e:
-            print(f"Error loading profile: {e}")
-            return {}
+    def load_profile_from_env(self):
+        return {
+            "personal": {
+                "first_name": os.getenv("FIRST_NAME"),
+                "last_name": os.getenv("LAST_NAME"),
+                "email": os.getenv("EMAIL"),
+                "phone": os.getenv("PHONE"),
+                "location": os.getenv("LOCATION"),
+                "linkedin": os.getenv("LINKEDIN"),
+                "address": {
+                    "street": os.getenv("ADDRESS_STREET"),
+                    "city": os.getenv("ADDRESS_CITY"),
+                    "state": os.getenv("ADDRESS_STATE"),
+                    "zip": os.getenv("ADDRESS_ZIP")
+                }
+            }
+        }
 
     def get_field(self, category, field=None):
         if field:
+            if '.' in field:  # Handle nested fields like 'address.street'
+                subcategory, subfield = field.split('.')
+                return self.profile.get(category, {}).get(subcategory, {}).get(subfield)
             return self.profile.get(category, {}).get(field)
         return self.profile.get(category)
-
-    def update_field(self, category, field, value):
-        if category not in self.profile:
-            self.profile[category] = {}
-        self.profile[category][field] = value
-        self._save_profile()
-
-    def _save_profile(self):
-        with open(self.profile_path, 'w') as f:
-            json.dump(self.profile, f, indent=4)

@@ -8,7 +8,7 @@ from application_handler.application_tracker import ApplicationTracker
 def main():
     # Initialize components
     print("\n=== Initializing Job Application Assistant ===")
-    user_profile = UserProfile('config/user_info.json')
+    user_profile = UserProfile()
     response_templates = ResponseTemplates('config/response_bank.json')
     form_filler = FormFiller(user_profile, response_templates)
     tracker = ApplicationTracker()
