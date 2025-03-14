@@ -1,70 +1,48 @@
-from docx import Document
-import re
-from datetime import datetime
+from .resume_data import RESUME_DATA
 
 class ResumeParser:
-    def __init__(self, file_path):
-        self.document = Document(file_path)
-        self.work_experience = []
-        self.parse_resume()
+    def __init__(self, file_path=None):
+        # We'll ignore file_path since we're using static data
+        self.work_experience = RESUME_DATA["work_experience"]
+        self.personal = RESUME_DATA["personal"]
+        self.education = RESUME_DATA["education"]
+        self.skills = RESUME_DATA["skills"]
+        self.projects = RESUME_DATA["projects"]
 
-    # Parse the resume and extract the work experience. This is simplified to work with .docx files
     def parse_resume(self):
-        current_section = None
-        current_job = {}
-        
-        for paragraph in self.document.paragraphs:
-            text = paragraph.text.strip()
-            
-            if not text:
-                continue
-                
-            # Detect section headers
-            if text.upper() in ['RELEVANT EXPERIENCE', 'EXPERIENCE']:
-                current_section = 'experience'
-                continue
-                
-            if current_section == 'experience':
-                # Check for special case with Fork
-                if text.startswith('Fork —') or text.startswith('Fork –'):
-                    if current_job:
-                        self.work_experience.append(current_job)
-                    current_job = {
-                        'title': 'Backend Software Engineer Intern',
-                        'company': 'Fork',
-                        'location': 'Los Angeles, CA',
-                        'dates': 'August 2023 - May 2024',
-                        'description': []
-                    }
-                    continue
-                
-                # Regular job entry parsing
-                if ' — ' in text or ' – ' in text:
-                    if current_job:
-                        self.work_experience.append(current_job)
-                    parts = re.split(' — | – ', text)
-                    current_job = {
-                        'title': parts[0].strip(),
-                        'company': '',
-                        'location': parts[1].strip() if len(parts) > 1 else '',
-                        'dates': '',
-                        'description': []
-                    }
-                elif current_job and not current_job['company'] and 'Fork' not in current_job['title']:
-                    current_job['company'] = text
-                elif current_job and ('Present' in text or re.search(r'\d{4}', text)) and 'Fork' not in text:
-                    current_job['dates'] = text
-                elif current_job and text.startswith('•'):
-                    current_job['description'].append(text)
-        
-        # Add the last job if exists
-        if current_job:
-            self.work_experience.append(current_job)
+        # No need to parse anything
+        pass
 
     def get_work_experience(self):
         return self.work_experience
 
     def get_most_recent_job(self):
-        if not self.work_experience:
-            return None
-        return self.work_experience[0]
+        return self.work_experience[0] if self.work_experience else None
+
+    def get_skills(self):
+        return {
+            "full_stack": ", ".join(self.skills["full_stack"]),
+            "ai_ml": ", ".join(self.skills["ai_ml"])
+        }
+
+    def get_education(self):
+        return self.education
+
+    def get_personal_info(self):
+        return self.personal
+
+    def get_projects(self):
+        return self.projects
+
+    def _normalize_date(self, date_str):
+        # Add common date format handling
+        date_str = date_str.lower().strip()
+        date_str = date_str.replace('present', 'Present')
+        return date_str
+
+    def _clean_bullet_point(self, text):
+        # Clean up bullet points for better formatting
+        text = text.strip()
+        if text.startswith('•'):
+            text = text[1:].strip()
+        return text

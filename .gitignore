@@ -3,5 +3,5 @@ __pycache__/
 .env
 config/user_info.json
 applications.json
-resume.docx
 test_parser.py
+Jordan-Conklin-Software-Engineer-Resume.pdf

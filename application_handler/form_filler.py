@@ -6,6 +6,96 @@ class FormFiller:
     def fill_common_fields(self, page):
         print("\nAttempting to fill personal information...")
         
+        # Greenhouse.io specific field mapping
+        greenhouse_fields = {
+            'first_name': self.profile.get_field('personal', 'first_name'),
+            'last_name': self.profile.get_field('personal', 'last_name'),
+            'email': self.profile.get_field('personal', 'email'),
+            'phone': self.profile.get_field('personal', 'phone'),
+            'question_7392021005': self.profile.get_field('personal', 'linkedin'),  # LinkedIn field
+            'question_7392022005': self.profile.get_field('personal', 'website')   # Website field
+        }
+        
+        # Handle website field first with debug info
+        website_value = self.profile.get_field('personal', 'website')
+        print(f"\nAttempting to fill website field with value: {website_value}")
+        
+        # Try multiple approaches for website field
+        website_selectors = [
+            'input#question_7392022005',
+            'input[aria-label="Website"]',
+            '[id="question_7392022005"]',
+            'input[name*="website" i]',
+            'input[placeholder*="website" i]'
+        ]
+        
+        website_filled = False
+        for selector in website_selectors:
+            try:
+                print(f"Trying selector: {selector}")
+                element = page.query_selector(selector)
+                if element:
+                    print(f"Found element with selector: {selector}")
+                    # Try different fill methods
+                    try:
+                        element.fill(website_value)
+                        website_filled = True
+                        print(f"✅ Filled website using fill() method with selector: {selector}")
+                        break
+                    except Exception as e1:
+                        print(f"fill() failed, trying type: {e1}")
+                        try:
+                            element.type(website_value)
+                            website_filled = True
+                            print(f"✅ Filled website using type() method with selector: {selector}")
+                            break
+                        except Exception as e2:
+                            print(f"type() failed: {e2}")
+            except Exception as e:
+                print(f"Failed with selector {selector}: {e}")
+        
+        if not website_filled:
+            print("⚠️ Could not fill website field with any method")
+            # Print all input elements for debugging
+            inputs = page.query_selector_all('input')
+            print("\nAvailable input elements:")
+            for input_el in inputs:
+                attrs = input_el.evaluate('(element) => { return {...element.attributes} }')
+                print(f"Input attributes: {attrs}")
+        
+        # Continue with other fields...
+        for field_id, value in greenhouse_fields.items():
+            if field_id != 'question_7392022005':  # Skip website as we handled it separately
+                try:
+                    # Try to find element by ID first
+                    element = page.query_selector(f'#{field_id}')
+                    if element:
+                        element.fill(value)
+                        print(f"✅ Filled {field_id} successfully")
+                        continue
+                    
+                    # If ID fails, try by aria-label
+                    aria_labels = {
+                        'first_name': 'First Name',
+                        'last_name': 'Last Name',
+                        'email': 'Email',
+                        'phone': 'Phone',
+                        'question_7392021005': 'LinkedIn Profile'
+                    }
+                    
+                    if field_id in aria_labels:
+                        element = page.query_selector(f'input[aria-label="{aria_labels[field_id]}"]')
+                        if element:
+                            element.fill(value)
+                            print(f"✅ Filled {field_id} successfully")
+                            continue
+                    
+                    print(f"⚠️ Could not find field {field_id}")
+                    
+                except Exception as e:
+                    print(f"Error filling {field_id}: {e}")
+
+        # Fall back to generic field filling if needed
         fields_to_fill = {
             'firstName': self.profile.get_field('personal', 'first_name'),
             'lastName': self.profile.get_field('personal', 'last_name'),
@@ -117,6 +207,17 @@ class FormFiller:
                 f'input[id*="{field_name}" i]',
                 f'input[placeholder*="{field_name}" i]'
             ]
+
+    def _get_greenhouse_selectors(self, field_type):
+        selectors = {
+            'first_name': ['#first_name', 'input[aria-label="First Name"]'],
+            'last_name': ['#last_name', 'input[aria-label="Last Name"]'],
+            'email': ['#email', 'input[aria-label="Email"]'],
+            'phone': ['#phone', 'input[aria-label="Phone"]'],
+            'linkedin': ['#question_7392021005', 'input[aria-label="LinkedIn Profile"]'],
+            'website': ['#question_7392022005', 'input[aria-label="Website"]']
+        }
+        return selectors.get(field_type, [])
 
     def _handle_country_dropdown(self, page):
         try:
@@ -242,3 +343,49 @@ class FormFiller:
         if job['location']:
             print("\nLooking for location dropdown...")
             self._handle_location_dropdowns(page, job['location'])
+
+    def handle_greenhouse_dropdowns(self, page):
+        # Handle dropdown fields that use the select__input class
+        dropdown_fields = {
+            'question_7392023005': {'label': 'Work Authorization', 'value': 'Yes'},
+            'question_7392024005': {'label': 'Will you now or in the future require sponsorship', 'value': 'No'},  # Explicitly set to No
+            'gender': {'label': 'Gender', 'value': 'Male'},
+            'hispanic_ethnicity': {'label': 'Hispanic/Latino', 'value': 'No'},
+            'race': {'label': 'Race', 'value': 'Two or More Races'},
+            'veteran_status': {'label': 'Veteran Status', 'value': 'I am not a protected veteran'},
+            'disability_status': {'label': 'Disability Status', 'value': 'No, I Have Never Had A Disability'}
+        }
+        
+        for field_id, info in dropdown_fields.items():
+            try:
+                # Find the dropdown container
+                dropdown = page.query_selector(f'#{field_id}')
+                if dropdown:
+                    # Click to open dropdown
+                    dropdown.click()
+                    page.wait_for_timeout(1000)  # Wait for dropdown to open
+                    
+                    # Special handling for sponsorship question to ensure "No" is selected
+                    if field_id == 'question_7392024005':
+                        options = page.query_selector_all('[class*="select__option"]')
+                        for option in options:
+                            option_text = option.text_content().strip()
+                            if option_text.lower() == 'no':
+                                option.click()
+                                print(f"✅ Selected 'No' for sponsorship requirement")
+                                break
+                        continue
+
+                    # Handle other dropdowns normally
+                    options = page.query_selector_all('[class*="select__option"]')
+                    for option in options:
+                        option_text = option.text_content().strip()
+                        if option_text == info['value']:
+                            option.click()
+                            print(f"✅ Selected '{option_text}' for {info['label']}")
+                            break
+                    
+                    page.wait_for_timeout(500)  # Wait for selection to register
+                
+            except Exception as e:
+                print(f"⚠️ Failed to handle dropdown {info['label']}: {e}")

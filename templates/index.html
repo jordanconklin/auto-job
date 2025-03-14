@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Job Application Assistant</title>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+</head>
+<body class="bg-gray-100 p-8">
+    <div class="max-w-2xl mx-auto bg-white p-6 rounded-lg shadow">
+        <h1 class="text-2xl font-bold mb-4">Job Application Assistant</h1>
+        
+        <div class="mb-4">
+            <label class="block mb-2">Job URL:</label>
+            <input type="text" id="jobUrl" class="w-full p-2 border rounded">
+        </div>
+        
+        <button onclick="startApplication()" class="bg-blue-500 text-white px-4 py-2 rounded">
+            Start Application
+        </button>
+        
+        <div id="results" class="mt-4 hidden">
+            <h2 class="text-xl font-bold mb-2">Generated Cover Letter</h2>
+            <div id="coverLetter" class="p-4 border rounded bg-gray-50 whitespace-pre-line font-mono"></div>
+            
+            <div class="mt-4">
+                <button onclick="downloadPDF()" class="bg-green-500 text-white px-4 py-2 rounded mr-2">
+                    Download PDF
+                </button>
+                <button onclick="copyToClipboard()" class="bg-gray-500 text-white px-4 py-2 rounded">
+                    Copy to Clipboard
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        async function startApplication() {
+            const jobUrl = document.getElementById('jobUrl').value;
+            const results = document.getElementById('results');
+            
+            try {
+                const response = await fetch('/apply', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ job_url: jobUrl })
+                });
+                
+                const data = await response.json();
+                if (data.success) {
+                    document.getElementById('coverLetter').textContent = data.cover_letter;
+                    results.classList.remove('hidden');
+                } else {
+                    alert('Error: ' + data.error);
+                }
+            } catch (e) {
+                alert('Error processing application');
+            }
+        }
+    </script>
+</body>
+</html> 

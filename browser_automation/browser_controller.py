@@ -1,20 +1,34 @@
 from playwright.sync_api import sync_playwright, TimeoutError
 import time
+import os
 
 class BrowserController:
     def __init__(self):
-        self.playwright = None
-        self.browser = None
-        self.context = None
-        self.page = None
+        # Initialize playwright with proper environment
+        os.environ['PLAYWRIGHT_BROWSERS_PATH'] = '0'  # Force browser download in the project directory
+        
+        self.playwright = sync_playwright().start()
+        # Launch browser with additional options for better compatibility
+        self.browser = self.playwright.chromium.launch(
+            headless=False,  # Show the browser
+            args=[
+                '--no-sandbox',
+                '--disable-setuid-sandbox',
+                '--disable-dev-shm-usage',
+                '--disable-gpu'
+            ]
+        )
+        self.context = self.browser.new_context()
+
+    def new_page(self):
+        return self.context.new_page()
 
     def start_browser(self):
-        self.playwright = sync_playwright().start()
-        self.browser = self.playwright.chromium.launch(headless=False)
-        self.context = self.browser.new_context()
-        self.page = self.context.new_page()
-        # Set default timeout
-        self.page.set_default_timeout(10000)  # 10 seconds
+        if not self.browser:
+            self.browser = self.playwright.chromium.launch(headless=False)
+            self.context = self.browser.new_context()
+            self.page = self.context.new_page()
+            self.page.set_default_timeout(10000)  # 10 seconds
 
     def navigate_to(self, url):
         try:
@@ -28,6 +42,8 @@ class BrowserController:
             return None
 
     def close(self):
+        if self.context:
+            self.context.close()
         if self.browser:
             self.browser.close()
         if self.playwright:

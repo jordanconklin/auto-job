@@ -5,13 +5,15 @@ from data.response_templates import ResponseTemplates
 from application_handler.form_filler import FormFiller
 from application_handler.application_tracker import ApplicationTracker
 from data.resume_parser import ResumeParser
+from ai_services.openai_client import CoverLetterGenerator
+import sys
 
 def handle_resume_upload(page):
     print("\n📄 Looking for resume upload field...")
     upload_button = page.query_selector('input[type="file"]')
     if upload_button:
         try:
-            upload_button.set_input_files('resume.docx')
+            upload_button.set_input_files('Jordan-Conklin-Software-Engineer-Resume.pdf')
             print("✅ Resume uploaded successfully")
             return True
         except Exception as e:
@@ -21,93 +23,221 @@ def handle_resume_upload(page):
         print("⚠️ Could not find resume upload field")
         return False
 
-def main():
-    # Initialize components
-    print("\n=== Initializing Job Application Assistant ===")
-    user_profile = UserProfile()
-    response_templates = ResponseTemplates('config/response_bank.json')
-    form_filler = FormFiller(user_profile, response_templates)
-    tracker = ApplicationTracker()
-    browser = BrowserController()
+def handle_greenhouse_application(page, form_filler, resume_parser):
+    print("\nReady to fill application form")
+    proceed = input("\nWould you like to proceed with filling the application? (y/n): ").lower()
+    
+    if proceed != 'y':
+        print("Application process cancelled")
+        return
+    
+    print("\nStarting application form fill...")
+    
+    # Fill basic information
+    form_filler.fill_common_fields(page)
+    
+    # Handle dropdowns
+    form_filler.handle_greenhouse_dropdowns(page)
+    
+    # Handle resume upload
+    print("\nUploading resume...")
+    upload_button = page.query_selector('#resume')
+    if upload_button:
+        try:
+            upload_button.set_input_files('Jordan-Conklin-Software-Engineer-Resume.pdf')
+            print("Resume uploaded successfully")
+            # Wait for resume to be processed
+            page.wait_for_timeout(2000)
+        except Exception as e:
+            print(f"Failed to upload resume: {e}")
+    
+    # After filling everything, wait for user confirmation
+    print("\n=== Application Review ===")
+    print("Please review all filled information before proceeding.")
+    print("NOTE: The application will NOT be submitted automatically.")
+    
+    final_proceed = input("\nWould you like to keep these changes? (y/n): ").lower()
+    if final_proceed != 'y':
+        print("\nCancelling application - no changes will be submitted")
+        return
+    
+    print("\nApplication filled successfully!")
+    print("You can now review and submit the application manually when ready.")
 
+def handle_cover_letter_generation(job_description, company_name, position, resume_parser):
     try:
-        # Get job URL from user
-        job_url = input("\nEnter job application URL: ")
+        generator = CoverLetterGenerator()
         
-        # Start browser and navigate to page
-        print("\n🌐 Opening browser...")
-        browser.start_browser()
-        page = browser.navigate_to(job_url)
+        # Get resume data
+        resume_data = {
+            "work_experience": resume_parser.get_work_experience(),
+            "skills": resume_parser.get_skills(),
+            "education": resume_parser.get_education()
+        }
         
-        if not page:
-            raise Exception("Failed to load page")
+        # Generate cover letter
+        cover_letter = generator.generate_cover_letter(
+            company_name,
+            position,
+            job_description,
+            resume_data
+        )
+        
+        print("\n=== Generated Cover Letter ===")
+        print(cover_letter)
+        print("="*50)
+        
+        return cover_letter
+        
+    except Exception as e:
+        print(f"Failed to generate cover letter: {e}")
+        return None
 
-        # Wait for manual login
-        print("\n👋 Please log in manually in the browser window")
-        input("Press Enter once you've logged in and are on the application page...")
+def extract_job_description(page):
+    """Extract job description from Greenhouse.io page"""
+    try:
+        # Try different selectors for job description
+        description_selectors = [
+            'div#content',
+            'div[data-test="description"]',
+            'div.job-description',
+            'div#job_description',
+            'div.opening-desc'
+        ]
         
-        # Parse page and fill forms
-        print("\n🔍 Analyzing application form...")
-        parser = PageParser(page)
+        for selector in description_selectors:
+            description_element = page.query_selector(selector)
+            if description_element:
+                description = description_element.text_content().strip()
+                if description:
+                    return description
         
-        print("\n📝 Filling common fields (name, email, phone)...")
-        form_filler.fill_common_fields(page)
-        print("✅ Basic information filled")
+        # Fallback: try to get all text content from the page
+        content = page.query_selector('body').text_content()
+        return content
+    except Exception as e:
+        print(f"Error extracting job description: {e}")
+        return None
 
-        # Add after filling common fields:
-        print("\n📄 Uploading and parsing resume...")
-        resume_path = 'resume.docx'
-        resume_parser = ResumeParser(resume_path)
+def main():
+    browser = None
+    try:
+        print("\n=== Job Application Assistant ===")
         
-        if handle_resume_upload(page):
-            print("\n📝 Filling work experience from resume...")
-            form_filler.fill_work_experience(page, resume_parser)
+        # Initialize components silently
+        user_profile = UserProfile()
+        response_templates = ResponseTemplates('config/response_bank.json')
+        form_filler = FormFiller(user_profile, response_templates)
+        tracker = ApplicationTracker()
+        browser = BrowserController()
+        resume_parser = ResumeParser()
+
+        # Get job URL
+        job_url = input("\nEnter job URL: ")
         
-        # Handle free response questions
-        print("\n📋 Looking for free response questions...")
-        free_responses = parser.detect_free_response_questions()
+        # Navigate and extract info
+        print("\nProcessing job posting...")
+        page = browser.new_page()
+        page.goto(job_url)
+        page.wait_for_load_state('networkidle')
         
-        if free_responses:
-            print(f"Found {len(free_responses)} free response questions")
-            for question in free_responses:
-                print(f"\n❓ Question found: {question['question']}")
-                default_response = response_templates.get_response(
-                    question['question'].lower().replace(' ', '_'))
+        # Extract job details
+        company_name = page.query_selector('a.company-name, .company-info h1')
+        position = page.query_selector('h1.app-title, .job-title')
+        
+        company_name = company_name.text_content().strip() if company_name else input("Company name not found. Please enter: ")
+        position = position.text_content().strip() if position else input("Position title not found. Please enter: ")
+        
+        print(f"\nCompany: {company_name}")
+        print(f"Position: {position}")
+        
+        # Extract and verify job description
+        job_description = extract_job_description(page)
+        if job_description:
+            print("\n=== Job Description ===")
+            print(job_description)
+            print("="*50)
+            
+            proceed = input("\nIs this the correct job description? (y/n): ").lower()
+            if proceed != 'y':
+                print("\nPlease paste the correct job description (press Enter twice when done):")
+                lines = []
+                while True:
+                    line = input()
+                    if line == "":
+                        break
+                    lines.append(line)
+                job_description = "\n".join(lines)
+
+        # Generate cover letter
+        print("\nGenerating cover letter...")
+        cover_letter = handle_cover_letter_generation(
+            job_description,
+            company_name,
+            position,
+            resume_parser
+        )
+
+        if not cover_letter:
+            print("\nUnable to generate cover letter. Options:")
+            print("1. Continue without cover letter")
+            print("2. Exit application")
+            choice = input("Choose option (1-2): ")
+            
+            if choice != "1":
+                print("\nExiting application process")
+                return
+
+        elif cover_letter:
+            print("\nCover letter options:")
+            print("1. Save as PDF")
+            print("2. Save as text file")
+            print("3. Copy to clipboard")
+            print("4. Continue without saving")
+            choice = input("Choose option (1-4): ")
+            
+            if choice == "1":
+                from document_generator.pdf_generator import CoverLetterPDF
+                pdf_gen = CoverLetterPDF()
+                filename = pdf_gen.generate(cover_letter, company_name)
+                print(f"Saved as PDF: {filename}")
                 
-                print(f"📎 Default response available: {default_response[:50]}...")
-                use_default = input("Use default response? (y/n): ").lower() == 'y'
-                
-                response = default_response if use_default else input("Enter your response: ")
-                if form_filler.fill_free_response(question['element'], response):
-                    print("✅ Response filled successfully")
-                else:
-                    print("⚠️ Failed to fill response")
+                # Ask if they want to upload the PDF
+                upload = input("\nWould you like to upload this cover letter to the application? (y/n): ").lower()
+                if upload == 'y':
+                    cover_letter_button = page.query_selector('#cover_letter')
+                    if cover_letter_button:
+                        try:
+                            cover_letter_button.set_input_files(filename)
+                            print("Cover letter uploaded successfully")
+                        except Exception as e:
+                            print(f"Failed to upload cover letter: {e}")
+            elif choice == "2":
+                filename = f"cover_letter_{company_name.lower().replace(' ', '_')}.txt"
+                with open(filename, 'w') as f:
+                    f.write(cover_letter)
+                print(f"Saved as: {filename}")
+            elif choice == "3":
+                import pyperclip
+                pyperclip.copy(cover_letter)
+                print("Copied to clipboard")
+
+        # Ask before proceeding with application
+        proceed_to_apply = input("\nWould you like to proceed with filling out the application? (y/n): ").lower()
+        if proceed_to_apply == 'y':
+            print("\nProceeding with application form...")
+            handle_greenhouse_application(page, form_filler, resume_parser)
         else:
-            print("No free response questions found")
-
-        # Track application
-        print("\n📊 Tracking application...")
-        company = input("Enter company name: ")
-        position = input("Enter position title: ")
-        tracker.add_application(job_url, company, position)
-        print("✅ Application tracked successfully")
-
-        print("\n⚠️ Please review the application before submitting!")
-        submit = input("Should I submit the application? (y/n): ").lower() == 'y'
-        
-        if submit:
-            print("\n🚀 Looking for submit button...")
-            # Add submit button logic here
-            print("Please click the submit button manually for now")
-        
-        input("\nPress Enter to close the browser...")
+            print("\nStopping before application form")
 
     except Exception as e:
-        print(f"\n❌ An error occurred: {e}")
+        print(f"\nError: {e}")
     finally:
-        print("\n👋 Closing browser...")
-        browser.close()
-        print("Done! Check applications.json for your application history")
+        if browser:
+            print("\nClosing browser...")
+            browser.close()
+            print("Application process complete")
+            print("\nReminder: If you proceeded with the application, you'll need to submit it manually.")
 
 if __name__ == "__main__":
     main()
